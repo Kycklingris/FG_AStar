@@ -10,7 +10,7 @@ public class SegmentFlip : MonoBehaviour
     private bool topUp = true;
     private MeshRenderer meshRenderer;
 
-    void Start()
+    void Awake()
     {
         this.meshRenderer = this.gameObject.GetComponent<MeshRenderer>();
     }
