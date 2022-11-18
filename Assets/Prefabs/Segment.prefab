@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 6942460255576128117}
   - component: {fileID: 6338615559620326864}
   - component: {fileID: 8076007521812087066}
+  - component: {fileID: 2207815737016282347}
   - component: {fileID: 6338615559620326865}
   m_Layer: 0
   m_Name: Segment
@@ -85,6 +86,19 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!65 &2207815737016282347
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7715583692366782671}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Size: {x: 0.02, y: 0.020000005, z: 0.0050274646}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &6338615559620326865
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -97,5 +111,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 82fe1ef18e0698f4aa0cb91fcbe12700, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  flipTime: 0.5
-  intervals: 0.001
+  flipTime: 0.25
+  timeStep: 0.001
