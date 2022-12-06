@@ -2,6 +2,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+using Utils;
+
 public class GridController : MonoBehaviour
 {
 	[SerializeField] private int height = 20;
@@ -20,7 +22,7 @@ public class GridController : MonoBehaviour
 
 	private Transform player;
 
-	private AlgoSegment target;
+	private Position target;
 
 	private List<Segment> path = new List<Segment>();
 
@@ -44,7 +46,7 @@ public class GridController : MonoBehaviour
 				instance.SwitchMaterial(this.regularMaterial);
 
 				var hasObstacle = false;
-				if (Random.Range(0, 101) <= this.obstacleChance && playerPos != new Position(x, z))
+				if (Random.Range(0, 101) <= this.obstacleChance && playerPos.x != x && playerPos.y != z)
 				{
 					GameObject obstacleInstance = Instantiate(this.obstaclePrefab, Vector3.zero, Quaternion.identity, instance.gameObject.transform);
 					obstacleInstance.transform.localPosition = new Vector3(0.0f, 0.0f, 0.01f);
@@ -80,66 +82,78 @@ public class GridController : MonoBehaviour
 			return;
 		}
 
-		if (this.target != null)
-		{
-			this.target.segment.flip.FlipToMaterial(this.regularMaterial);
-		}
+		this.GridPositionToSegment(this.target).flip.FlipToMaterial(this.regularMaterial);
 
 		newTarget.flip.FlipToMaterial(this.targetMaterial);
-		this.target = new AlgoSegment() { segment = newTarget, f = 0, g = 0, pos = segmentPosition };
+		this.target = segmentPosition;
 
 
 		this.player = GameObject.FindGameObjectsWithTag("Player")[0].transform;
 		var playerPos = this.ObjectGridToPosition(this.player);
-		var playerSegment = this.GridPositionToSegment(playerPos);
 
-		Queue<AlgoSegment> frontier = new Queue<AlgoSegment>();
-		List<AlgoSegment> reached = new List<AlgoSegment>();
+		var frontier = new PriorityQueue<Position, int>();
+		var cameFrom = new Dictionary<Position, Position>();
+		var costSoFar = new Dictionary<Position, int>();
 
-		frontier.Enqueue(new AlgoSegment() { segment = playerSegment, f = 0, g = 0, pos = playerPos });
-		reached.Add(new AlgoSegment() { segment = playerSegment, f = 0, g = 0, pos = playerPos });
+
+		frontier.Enqueue(playerPos, 0);
+		cameFrom.Add(playerPos, playerPos);
+		costSoFar.Add(playerPos, 0);
 
 		while (frontier.Count > 0)
 		{
-			// if (reached.Count > 500 || frontier.Count > 500)
-			// {
-			// 	break;
-			// }
-
 			var current = frontier.Dequeue();
 			var neighbors = GetSegmentNeighbors(current);
+
+			if (current == this.target)
+			{
+				break;
+			}
 
 			while (neighbors.Count > 0)
 			{
 				var next = neighbors.Dequeue();
 
-				var contained = false;
-
-				foreach (var item in reached)
+				if (GridPositionToSegment(next).hasObstacle)
 				{
-					if (item.pos.x == next.pos.x && item.pos.y == next.pos.y)
-					{
-						contained = true;
-						break;
-					}
+					continue;
 				}
 
-				if (!contained)
+				var newCost = costSoFar[current] + 1;
+
+				if (!costSoFar.ContainsKey(next) || 
+				(costSoFar.ContainsKey(next) && costSoFar[next] > newCost))
 				{
-					frontier.Enqueue(next);
-					reached.Add(next);
+					costSoFar.Remove(next);
+					costSoFar.Add(next, newCost);
+
+					var priority = newCost + ManhattanDistance(next.x, next.y, this.target.x, this.target.y);
+
+					frontier.Enqueue(next, priority);
+					
+					cameFrom.Remove(next);
+					cameFrom.Add(next, current);
 				}
 			}
-
 		}
 
-		foreach (var item in reached)
+		var currentSegment = this.target;
+		var path = new Queue<Position>();
+
+		while (currentSegment != playerPos)
 		{
-			item.segment.flip.FlipToMaterial(this.pathMaterial);
+			path.Enqueue(currentSegment);
+			currentSegment = cameFrom[currentSegment];
 		}
+
+		foreach (var item in path)
+		{
+			GridPositionToSegment(item).flip.FlipToMaterial(this.pathMaterial);
+		}
+
 	}
 
-	float ManhattanDistance(float x1, float z1, float x2, float z2)
+	int ManhattanDistance(int x1, int z1, int x2, int z2)
 	{
 		return Mathf.Abs(x1 - x2) + Mathf.Abs(z1 - z2);
 	}
@@ -150,60 +164,33 @@ public class GridController : MonoBehaviour
 		(z1 - z2) * 2));
 	}
 
-	Queue<AlgoSegment> GetSegmentNeighbors(AlgoSegment segment)
+	Queue<Position> GetSegmentNeighbors(Position segment)
 	{
-		var ret = new Queue<AlgoSegment>();
-		var pos = segment.pos;
-
-		// Debug.Log("x: " + pos.x + ", y: " + pos.y);
+		var ret = new Queue<Position>();
+		var pos = segment;
 
 		if (pos.x - 1 >= -this.width / 2)
 		{
-			var newPos1 = new Position(pos.x - 1, pos.y);
-			ret.Enqueue(new AlgoSegment()
-			{
-				segment = GridPositionToSegment(newPos1),
-				f = 0,
-				g = 0,
-				pos = newPos1,
-			});
-
+			var newPos = new Position(pos.x - 1, pos.y);
+			ret.Enqueue(newPos);
 		}
 
 		if (pos.x + 1 <= this.width / 2)
 		{
-			var newPos2 = new Position(pos.x + 1, pos.y);
-			ret.Enqueue(new AlgoSegment()
-			{
-				segment = GridPositionToSegment(newPos2),
-				f = 0,
-				g = 0,
-				pos = newPos2,
-			});
+			var newPos = new Position(pos.x + 1, pos.y);
+			ret.Enqueue(newPos);
 		}
 
 		if (pos.y - 1 >= -this.height / 2)
 		{
-			var newPos3 = new Position(pos.x, pos.y - 1);
-			ret.Enqueue(new AlgoSegment()
-			{
-				segment = GridPositionToSegment(newPos3),
-				f = 0,
-				g = 0,
-				pos = newPos3,
-			});
+			var newPos = new Position(pos.x, pos.y - 1);
+			ret.Enqueue(newPos);
 		}
 
 		if (pos.y + 1 <= this.height / 2)
 		{
-			var newPos4 = new Position(pos.x, pos.y + 1);
-			ret.Enqueue(new AlgoSegment()
-			{
-				segment = GridPositionToSegment(newPos4),
-				f = 0,
-				g = 0,
-				pos = newPos4,
-			});
+			var newPos = new Position(pos.x, pos.y + 1);
+			ret.Enqueue(newPos);
 		}
 
 		return ret;
@@ -226,8 +213,7 @@ public class GridController : MonoBehaviour
 	}
 }
 
-public class Position
-{
+public struct Position {
 	public int x;
 	public int y;
 
@@ -236,19 +222,51 @@ public class Position
 		this.x = x;
 		this.y = y;
 	}
-}
 
+	public static bool operator ==(Position a, Position b)
+	{
+		if (a.x == b.x && a.y == b.y)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	public static bool operator !=(Position a, Position b)
+	{
+		if (a.x == b.x && a.y == b.y)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+
+	public override int GetHashCode()
+	{ // https://stackoverflow.com/questions/892618/create-a-hashcode-of-two-numbers
+		unchecked // Overflow is fine, just wrap
+		{
+			int hash = 23;
+			// Suitable nullity checks etc, of course :)
+			hash = hash * 31 + this.x.GetHashCode();
+			hash = hash * 31 + this.y.GetHashCode();
+			return hash;
+		}
+	}
+
+	public override bool Equals(object obj)
+	{
+		return base.Equals(obj);
+	}
+}
 
 public class Segment
 {
 	public SegmentFlip flip;
 	public bool hasObstacle;
-}
-
-public class AlgoSegment
-{
-	public Segment segment;
-	public float f;
-	public float g;
-	public Position pos;
 }
