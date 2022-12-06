@@ -10,6 +10,7 @@ public class GridController : MonoBehaviour
 	[SerializeField] private int width = 20;
 	[SerializeField] private int segmentSize = 2;
 	[SerializeField] private int obstacleChance = 25;
+	[SerializeField] private float moveTimer = 2.5f;
 	[SerializeField] private SegmentFlip segmentGameObject;
 	[SerializeField] private GameObject obstaclePrefab;
 
@@ -24,7 +25,7 @@ public class GridController : MonoBehaviour
 
 	private Position target;
 
-	private List<Segment> path = new List<Segment>();
+	private Queue<Position> path = new Queue<Position>();
 
 	private void Awake()
 	{
@@ -57,6 +58,8 @@ public class GridController : MonoBehaviour
 			}
 		}
 
+
+		StartCoroutine(Move());
 	}
 
 	private void Update()
@@ -73,22 +76,32 @@ public class GridController : MonoBehaviour
 		}
 	}
 
+	private IEnumerator Move()
+	{
+		while (true)
+		{
+			yield return new WaitForSeconds(this.moveTimer);
+
+			if (this.path.Count > 0)
+			{
+				var next = this.path.Dequeue();
+
+				GridPositionToSegment(next).flip.FlipToMaterial(this.regularMaterial);
+
+				this.player.transform.position = new Vector3(next.x * this.segmentSize, this.player.transform.position.y, next.y * this.segmentSize);
+			}
+		}
+	}
+
 	private void PathFind(Position segmentPosition)
 	{
-		var newTarget = this.GridPositionToSegment(segmentPosition);
-
-		if (newTarget.hasObstacle)
+		if (this.GridPositionToSegment(segmentPosition).hasObstacle)
 		{
 			return;
 		}
 
-		this.GridPositionToSegment(this.target).flip.FlipToMaterial(this.regularMaterial);
-
-		newTarget.flip.FlipToMaterial(this.targetMaterial);
 		this.target = segmentPosition;
 
-
-		this.player = GameObject.FindGameObjectsWithTag("Player")[0].transform;
 		var playerPos = this.ObjectGridToPosition(this.player);
 
 		var frontier = new PriorityQueue<Position, int>();
@@ -121,7 +134,7 @@ public class GridController : MonoBehaviour
 
 				var newCost = costSoFar[current] + 1;
 
-				if (!costSoFar.ContainsKey(next) || 
+				if (!costSoFar.ContainsKey(next) ||
 				(costSoFar.ContainsKey(next) && costSoFar[next] > newCost))
 				{
 					costSoFar.Remove(next);
@@ -130,27 +143,45 @@ public class GridController : MonoBehaviour
 					var priority = newCost + ManhattanDistance(next.x, next.y, this.target.x, this.target.y);
 
 					frontier.Enqueue(next, priority);
-					
+
 					cameFrom.Remove(next);
 					cameFrom.Add(next, current);
 				}
 			}
 		}
 
-		var currentSegment = this.target;
-		var path = new Queue<Position>();
+		if (!cameFrom.ContainsKey(this.target)) // If no path has been found, skip
+		{
+			return;
+		}
+
+		GridPositionToSegment(this.target).flip.FlipToMaterial(this.targetMaterial);
+
+		var currentSegment = cameFrom[this.target];
+		var revPath = new List<Position>();
 
 		while (currentSegment != playerPos)
 		{
-			path.Enqueue(currentSegment);
+			revPath.Add(currentSegment);
 			currentSegment = cameFrom[currentSegment];
 		}
 
-		foreach (var item in path)
+
+
+		while (this.path.Count > 0)
 		{
-			GridPositionToSegment(item).flip.FlipToMaterial(this.pathMaterial);
+			var next = this.path.Dequeue();
+
+			GridPositionToSegment(next).flip.FlipToMaterial(this.regularMaterial);
 		}
 
+		for (int i = revPath.Count - 1; i >= 0; i--)
+		{
+			GridPositionToSegment(revPath[i]).flip.FlipToMaterial(this.pathMaterial);
+			this.path.Enqueue(revPath[i]);
+		}
+
+		this.path.Enqueue(this.target);
 	}
 
 	int ManhattanDistance(int x1, int z1, int x2, int z2)
@@ -213,7 +244,8 @@ public class GridController : MonoBehaviour
 	}
 }
 
-public struct Position {
+public struct Position
+{
 	public int x;
 	public int y;
 
