@@ -1,0 +1,3 @@
+# FG_AStar
+
+Wasn't sure wether or not I was supposed to follow the redblob tutorial closely in regard to data types considering that dictionaries aren't exactly the easiest to work with in this context without also changing the GetHashCode method. Well, anyway, it works...
